@@ -40,25 +40,25 @@ function relativePath(path: string): string {
     </div>
     <div id="header">
         <h1 class="headerTitle">
-            <a href="/" title="Browse to homepage" v-if="frontmatter.layout === 'home'">Intel 4004 &mdash; 50th Anniversary Project</a>
-            <a href="/" title="Browse to homepage" v-else>4004</a>
+            <a :href="relativePath('/')" title="Browse to homepage" v-if="frontmatter.layout === 'home'">Intel 4004 &mdash; 50th Anniversary Project</a>
+            <a :href="relativePath('/')" title="Browse to homepage" v-else>4004</a>
         </h1>
         <div class="subHeader">
             <div align="left">
                 <span class="doNotDisplay">Navigation: </span>
-                <a href="/links.html">More Information</a> |
-                <a href="/#credits">Credits</a> |
-                <a href="/contact.html">Contact Us</a> |
-                <a href="/about.html">About Us</a>
+                <a :href="relativePath('/links.html')">More Information</a> |
+                <a :href="relativePath('/#credits')">Credits</a> |
+                <a :href="relativePath('/contact.html')">Contact Us</a> |
+                <a :href="relativePath('/about.html')">About Us</a>
             </div>
         </div>
     </div>
     <div class="leftSideBar" v-if="frontmatter.layout === 'home'">
         <p class="sideBarTitle">Quick Links</p>
         <ul>
-            <li class="sidebar-item"><a href="/#downloads">Cool Downloads</a></li>
-            <li><a href="/#FAQ" class="sidebar-item">FAQs</a></li>
-            <li class="sidebar-item"><a href="/#exhibit">Exhibit Project</a></li>
+            <li class="sidebar-item"><a :href="relativePath('/#downloads')">Cool Downloads</a></li>
+            <li><a :href="relativePath('/#FAQ')" class="sidebar-item">FAQs</a></li>
+            <li class="sidebar-item"><a :href="relativePath('/#exhibit')">Exhibit Project</a></li>
         </ul>
         <p class="sideBarTitle">Community Links</p>
         <ul>
@@ -90,8 +90,8 @@ function relativePath(path: string): string {
     <div class="leftSideBar" v-else>
         <p class="sideBarTitle">Quick Links</p>
         <ul>
-            <li class="sidebar-item"><a href="/">4004 Home</a></li>
-            <li class="sidebar-item"><a href="/#downloads">Cool Downloads</a></li>
+            <li class="sidebar-item"><a :href="relativePath('/')">4004 Home</a></li>
+            <li class="sidebar-item"><a :href="relativePath('/#downloads')">Cool Downloads</a></li>
         </ul>
         <p class="sideBarTitle">Advertisements</p>
         <div style="text-align: center;">
@@ -104,7 +104,7 @@ function relativePath(path: string): string {
             <strong>Nov 15, 2023</strong><br>
             <span class="sidebar-item">
                 Klaus Scheffler finishes his
-                <a href="/hackaday23/">
+                <a :href="relativePath('/hackaday23/')">
                 complete 4-bit computer (CPU+RAM+I/O) based on the Intel 4004 schematics using discrete transistors</a>.
                 Computes digits of Pi in stand-alone operation.
             </span>
@@ -120,7 +120,7 @@ function relativePath(path: string): string {
         <div class="sideBarText">
             <strong>Nov 15, 2022</strong><br>
             <span class="sidebar-item">
-                Lajos Kintli repackages his <a href="/assets/i400x_analyzer_repacked_20221111.zip">MCS-4 analyzer / simulator</a>.
+                Lajos Kintli repackages his <a :href="relativePath('/assets/i400x_analyzer_repacked_20221111.zip')">MCS-4 analyzer / simulator</a>.
                 Has win64 executable, verified 4004 mask artwork, transistor netlist.
             </span>
         </div>
@@ -140,20 +140,20 @@ function relativePath(path: string): string {
         <div class="sideBarText">
             <strong>Nov 15, 2015</strong><br>
             <span class="sidebar-item">
-                The team verifies the <a href="/2015-news.html">newly re-drawn, scalable mask artwork and designed a newly revised calculator replica using vintage chips</a>.
+                The team verifies the <a :href="relativePath('/2015-news.html')">newly re-drawn, scalable mask artwork and designed a newly revised calculator replica using vintage chips</a>.
             </span>
         </div>
         <div class="sideBarText">
             <strong>Nov 15, 2009</strong><br>
             <span class="sidebar-item">
-                Lajos Kintli releases the <a target="_blank" href="/mcs4-masks-schematics-sim.html">complete set of schematics and artwork for the MCS-4 chip family plus his improved simulator</a>.
+                Lajos Kintli releases the <a target="_blank" :href="relativePath('/mcs4-masks-schematics-sim.html')">complete set of schematics and artwork for the MCS-4 chip family plus his improved simulator</a>.
             </span>
         </div>
         <div class="sideBarText">
             <strong>Nov 15, 2008</strong><br>
             <span class="sidebar-item">
-                Bill Kotaska builds <a href="/busicom-replica.html">Busicom 141-PF calculator replica</a> and releases <a href="/busicom-schematics-and-simulator.html">schematics</a>.
-                Tim McNerney releases his <a href="/busicom-schematics-and-simulator.html">Shinshu Seiki Model-102 printer emulator for PIC18F2320</a>.
+                Bill Kotaska builds <a :href="relativePath('/busicom-replica.html')">Busicom 141-PF calculator replica</a> and releases <a :href="relativePath('/busicom-schematics-and-simulator.html')">schematics</a>.
+                Tim McNerney releases his <a :href="relativePath('/busicom-schematics-and-simulator.html')">Shinshu Seiki Model-102 printer emulator for PIC18F2320</a>.
             </span>
         </div>
         <div class="sideBarText">
@@ -165,24 +165,24 @@ function relativePath(path: string): string {
         <div class="sideBarText">
             <strong>Nov 15, 2006</strong><br>
             <span class="sidebar-item">
-                <a href="/slashdot.html">Credits</a> from the edited-out-of-the <a href="https://slashdot.org/" target="_blank">slashdot-article</a> department.
+                <a :href="relativePath('/slashdot.html')">Credits</a> from the edited-out-of-the <a href="https://slashdot.org/" target="_blank">slashdot-article</a> department.
             </span>
         </div>
         <div class="sideBarText">
             <p>
                 <strong>Nov 15, 1971</strong><br>
-                <a href="/4004-ad.html">MCS-4 (aka 4004 family) product announcement.</a><br>
+                <a :href="relativePath('/4004-ad.html')">MCS-4 (aka 4004 family) product announcement.</a><br>
             </p>
         </div>
-        <a href="/moreNews.html" class="more">more news »</a>
+        <a :href="relativePath('/moreNews.html')" class="more">more news »</a>
         <p class="sideBarTitle">Featured Downloads</p>
         <div class="sideBarText">
-            <a href="/2009/Busicom-141PF-Calculator_asm_rel-1-0-1.txt" target="_blank">
+            <a :href="relativePath('/2009/Busicom-141PF-Calculator_asm_rel-1-0-1.txt')" target="_blank">
                 Busicom 141-PF calculator firmware, recreated "source code"
             </a>
         </div>
         <div class="sideBarText">
-            <a href="/assets/busicom-141pf-simulator-w-flowchart-071113.zip">
+            <a :href="relativePath('/assets/busicom-141pf-simulator-w-flowchart-071113.zip')">
                 Busicom 141-PF calculator simulator
             </a>
         </div>
@@ -192,11 +192,11 @@ function relativePath(path: string): string {
     </div>
     <div id="footer">
         <div class="doNotDisplay">
-            <a href="/">Tell a Friend</a> |
-            <a href="/">Privacy Policy</a> |
-            <a href="/">Site Map</a> |
-            <a href="/">Feedback</a> |
-            <a href="/">Help</a>
+            <a :href="relativePath('/')">Tell a Friend</a> |
+            <a :href="relativePath('/')">Privacy Policy</a> |
+            <a :href="relativePath('/')">Site Map</a> |
+            <a :href="relativePath('/')">Feedback</a> |
+            <a :href="relativePath('/')">Help</a>
         </div>
         <div>{{ frontmatter.copyright }}</div>
     </div>
