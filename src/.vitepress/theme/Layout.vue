@@ -19,6 +19,7 @@ const { frontmatter, page } = useData() as {
 
 function relativePath(path: string): string {
     const level = page.value.relativePath.split('/').length - 1;
+    console.log(page.value.relativePath, level, '../'.repeat(level).slice(0, -1));
     if (level === 0) return '.' + path;
     else return '../'.repeat(level).slice(0, -1) + path;
 }
