@@ -1,0 +1,30 @@
+{
+    "compilerOptions": {
+        // Type Checking
+        "exactOptionalPropertyTypes": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "strict": true,
+        // Module
+        "module": "esnext",
+        "moduleResolution": "node",
+        // Interop Constraints
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "isolatedModules": false,
+        // JavaScript Support
+        "allowJs": true,
+        // Language and Environment
+        "lib": ["esnext", "dom"],
+        "target": "esnext",
+        // Completeness
+        "skipLibCheck": true,
+    },
+    "include": [
+        "src/.vitepress/config.ts",
+        "src/.vitepress/theme/**/*.ts",
+        "src/.vitepress/theme/**/*.vue"
+    ]
+}

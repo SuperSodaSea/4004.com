@@ -1,0 +1,21 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vitepress dev src",
+        "test:types": "vue-tsc --noEmit",
+        "clean": "rimraf .vitepress/cache src/.vitepress/cache src/.vitepress/dist",
+        "build": "vitepress build src",
+        "dist": "pnpm run clean && pnpm run build",
+        "preview": "vitepress preview src"
+    },
+    "devDependencies": {
+        "@types/node": "^18.19.4",
+        "rimraf": "^5.0.5",
+        "typescript": "^5.3.3",
+        "vite": "^5.0.10",
+        "vitepress": "1.0.0-rc.35",
+        "vue": "^3.4.4",
+        "vue-tsc": "^1.8.27"
+    }
+}

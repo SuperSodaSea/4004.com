@@ -1,0 +1,81 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title>Documentation for Busicom 141-PF Simulator with Animated Flowchart</title>             
+<script type="text/javascript">
+ <!--
+//<![CDATA[
+// Copyright 2006 by Bob Brown and BlueLinkWebs.com.
+// Licensed under the Creative Commons Attribution License.
+// Some rights reserved.
+function gemaddr(node, domain, local) {
+ var a = String.fromCharCode(64);
+ var mt = String.fromCharCode(109,97,105,108,116,111,58);
+ node.href = mt + local + a + domain; return true;
+}
+//]]>
+//-->
+</script>
+</head>
+<body bgcolor="#ffffff">
+<h2><font size="5">Documentation for Busicom 141-PF Simulator with Animated Flowchart</font> </h2>
+<div>
+<address>Software written by Fred Huettig </address>
+<address>Conceptual design by Tim McNerney </address>
+<p>Bug reports/comments to: <a href="#"
+ onclick="gemaddr(this, 'starboarddesign.com', 'busicom')">
+<span style="position: relative; top: 2px; left: 0px;">
+<img src="busicom-starboarddesign-com.png"
+ alt="busicom&#032;&#097;&#116;&#032;starboarddesign&#032;&#100;&#111;&#116;&#032;com"
+ title="busicom&#032;&#097;&#116;&#032;starboarddesign&#032;&#100;&#111;&#116;&#032;com"
+ border="0" height="15" width="218" />
+</span></a>
+</p>
+<h3>Introduction</h3>
+<div><p>This is a simulation of the Busicom 141-PF printing calculator, the first embedded application firmware ever written for a commercial off-the-shelf (COTS) microprocessor, the Intel 4004.  At the time that the 4004 and this software were being developed, Texas Instruments was developing a calculator chip of their own.  The distinction between Intel's microprocessor and TI's calculator-on-a-chip, was that TI's chip could only be a four-function calculator, whereas the Intel 4004 could, by changing the off-chip ROM, be programmed to serve a wide variety of applications.</p></div>
+
+<div><p>This simulator is running the actual code that was inside the Busicom ROMs extracted with the help of the <a href="http://www.computerhistory.org/">Computer History Museum</a>.  This code runs on a 4004 instruction-level simulator written in C++.</p></div>
+
+<div><p>When the user presses a key, the flowchart display shows the path that the calculator code takes to do a calculation.  These are not native 4004 instructions, but rather they are "byte codes" executed by an interpreter implemented in 4004 machine language.  Single-byte opcodes call into the calculator's primitive arithmetic library.  Two byte instructions implement conditional branches.  The interpreter does not support subroutine calling, so the entire calculator can be thought of as a giant "finite state machine" (FSM).  The way that the calculator was implemented, using this "virtual machine" architecture is a form of data compression ("code compression" really).  This allowed the whole calculator application to be implemented using only 1,024 bytes of ROM (1,280 bytes of ROM including the optional Square Root function).  Yes, you read this right.  The whole four-function calculator application fits in 1k bytes, including the keyboard scanner and print driver.  The calculator had only 80 bytes of data RAM.</p></div>
+<div>
+<h3>Installation / Instructions</h3>
+<ul>
+<li>Unpack ZIP file
+<li>Keep all files in the same directory
+<li>Double-click on Windows executable: busicom-141pf-sim.exe
+<li>To exit click "Quit"
+</ul>
+<h4>This is a 1970's style Adding Machine not a modern Calculator!</h4>
+<p>The electronic calculators that accountants used 35 years ago worked differently than the familiar four-function calculator we use today.  These were designed to behave much like mechanical adding machines of the 1960's.  After every number you want to add to the total, you need to press +, so = doesn't work like you'd expect.  Here are some examples:</p>
+<ul>
+<li>To add three numbers:  61 + 79 + 83 + = (if you forget the last +, the 83 won't get added)
+<li>To subtract two numbers: 2007 + 1971 - =
+<li>To multiply two numbers: 125 x 5 = (this is more like we're used to)
+<li>To divide two numbers: 625 / 5 =
+</ul>
+<p>Notice the "radio buttons" at the top of the keyboard.  These set the number of digits after decimal point.  If you set it to "0" you will only see integer results.  The other three buttons set the <em>rounding mode.</em>  OVF is the <em>overflow error</em> light.  If you see this checked, you will need to press "C" to clear the error, or nothing will seem to work after that. NEG means the current total or the number you are entering is negative.  The original calculator printed using both red and black ink, but this simulator doesn't.  The "S" key is the "change sign" +/- key used for entering negative numbers.  M means there is something in memory. </p>
+<p>This is a printing calculator.  The original Busicom 141-PF didn't have a display.  The simulator doesn't have a display.  Accountants back then didn't mind much.  They'd be looking at the document with the numbers they were working with, much like professional touch typists.  Nowadays all calculators have a display, so it might feel disconcerting that you can't see the number your are entering on the keypad until you press a function key like +.</p>
+<h3>Command-line arguments</h3>
+<div>These are the current command-line arguments, you can either type these at a DOS prompt or create a shortcut to the executable and add these to the "target" field of the shortcut properties. <br>
+</div>
+<ul>
+<li>-m<em>N</em> Enable the bus monitor, up to N cycles (where N is an integer).  A disassembled instruction trace will be saved to the file "4004out.txt".<br>
+</li>
+<li>-v  Only record VM accesses to page 3 (on the bus monitor)</li>
+<li>-s<em>A</em> Don't start recording until address A is executed (where A is an address in the range 0-255)<br>
+</li>
+<li>-f<em>N</em> Flowchart persistence, N = -1 for infinite, N = 0 for no flowchart</li>
+<li>-c<em>N</em> Machine cycles per millisecond (on average, if possible) (where N is an integer)<br>
+</li></ul>
+<div><p>The defaults are -f512, -c740, and monitoring 'off.' </p></div>
+
+<div><p>-m and -v together will give you the ability to see what the interpreter is doing, and each line of the output file "4004out.txt" is marked with a cycle number so you can get the timing of each VM instruction.</p></div>
+<div>
+<h3>Known issues</h3>
+<ul>
+<li>This software only runs under Microsoft Windows.  It has only been tested under Windows XP.  Members of the Mac OS and Linux community, please accept our apologies.  In the future we may make this simulator available under other operating systems.</li>
+<li>The printer window and the keyboard window always stay on top even when another application is selected.</li>
+<li>Don't click on the "X" (close window) button in the upper right corner.  It won't exit the program.  Click on "Quit" instead.</li>
+</ul>
+</body>
+</html>

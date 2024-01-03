@@ -1,0 +1,616 @@
+;---------------------------------------------------------------------------------------------------
+;
+; Calculating Pi using the inverse tangent formula with Intel 4004 CPU (MCS-4 system) to 16 digits.
+;
+; Written by Lajos Kintli.
+;
+; (version 2023.10.29)
+;
+;---------------------------------------------------------------------------------------------------
+;
+; Used formulas:
+;
+;       Euler:          Pi/4 = arc tg (1/2) + arc tg (1/3)
+;
+;       Better:         Pi/4 = 2 * arc tg (1/3) + arc tg (1/7)
+;
+;       Machin's:       Pi/4 = 4 * arc tg (1/5) - arc tg (1/239)
+;
+; Inverse tangent is calculated using the Taylor polynomial: 
+;
+;       arc tg(x)=x - x^3/3 + x^5/5 - x^7/7 + x^9/9 - x^11/11 + ...,
+;
+; what works for an integer reciprocal in the below way (x=1/n):
+;  
+;       arc tg(1/n)=1/n - 1/n^3/3 + 1/n^5/5 - 1/n^7/7 + 1/n^9/9 - 1/n^11/11 + ...
+;
+; Three high level registers are implemented, REG0 is for the sum, REG1 is for the next item
+; in Taylor polynomial: 1/n^(2k+1)/(2k+1), while REG2 is for 1/n^(2k+1). 
+;
+; Precision is 16*4 bit in binary. During the arc tg calculation the integer part of the number
+; is zero, only fractional part is stored in memory cells (decimal point is fixed before the first
+; memory cell). 
+;
+; REG2 is started with 1/n, and divided by n*n at every iterations. REG1 is coming
+; from REG2 divided by (2k+1).
+;
+; Binary result is converted to decimal at the end for 16 digits behind the decimal point
+;
+; Two divide routines are implemented, first is slightly faster and handles only 4 bit
+; divider, while the other accepts 8 bit divider.
+;
+; Register usage:
+;
+; r0,r1         RAM pointer (target register)
+; r2,r3         RAM pointer (source register)
+; r4,r5         divider
+; r6,r7         used for divide
+; r8            length counter
+; r9            bit counter
+; ra            next 4 bits
+; rb            sign bit or digit
+; rc,rd:        2 k + 1
+; re,rf:        n*n if n=2,3,7 or n=239 (highest bit decides if it is n or n*n)
+; 
+; ram 00-0f:    REG0: sum
+; ram 10-1f:    REG1: 1/n^(2k+1)/(2k+1)
+; ram 20-2f:    REG2: 1/n^(2k+1)
+; ram 30-3f:    decimal result
+;
+; Result RAM0 content:
+;       0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 - 0 0 0 0
+;       0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 - 0 0 0 0
+;       2 4 3 F 6 A 8 8 8 5 A 3 0 8 D 8 - 0 0 0 0       <-- fractional in hex
+;       1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 - 0 0 0 3       <-- decimal
+;
+;---------------------------------------------------------------------------------------------------
+                     
+                     ; Set one of the below definitions to 1!
+                     
+0000                 EULER           EQU     0
+0000                 BETTER          EQU     0
+0001                 MACHIN          EQU     1
+                     
+                     ; Enable 7 segment digit
+                     
+0001                 DISPLAY         EQU     1
+                     
+0000                                 org     0
+                     
+0000   00                            nop
+0001   40 f0                         jun     start
+                     
+                     ;------------------------------------------------------------------------------
+                     ; ADD:  [DST] = [DST] + [SRC]
+                     ;------------------------------------------------------------------------------
+                     
+0003   f1            add_xy:         clc
+0004   23            add_loop:       src     2
+0005   e9                            rdm
+0006   21                            src     0
+0007   eb                            adm
+0008   e0                            wrm
+0009   63                            inc     3
+000a   71 04                         isz     1,add_loop
+000c   c0                            bbl     0
+                     
+                     ;------------------------------------------------------------------------------
+                     ; SUB:  [DST] = [DST] - [SRC]
+                     ;------------------------------------------------------------------------------
+000d   f1            sub_xy:         clc
+000e   21            sub_loop:       src     0
+000f   e9                            rdm
+0010   23                            src     2
+0011   e8                            sbm
+0012   f3                            cmc
+0013   21                            src     0
+0014   e0                            wrm
+0015   63                            inc     3
+0016   71 0e                         isz     1,sub_loop
+0018   c0                            bbl     0
+                     
+                     ;------------------------------------------------------------------------------
+                     ; FILL: [DST] = value
+                     ;------------------------------------------------------------------------------
+                     
+0019   d0            storez:         ldm     0                       
+001a   21            store:          src     0
+001b   e0                            wrm
+001c   71 1a                         isz     1,store
+001e   c0                            bbl     0
+                                     
+                     ;------------------------------------------------------------------------------
+                     ; MOV:  [DST] = [SRC]
+                     ;------------------------------------------------------------------------------
+                     
+001f                 mov_xy:
+001f   23            mov_loop:       src     2
+0020   e9                            rdm
+0021   21                            src     0
+0022   e0                            wrm
+0023   63                            inc     3
+0024   71 1f                         isz     1,mov_loop
+0026   c0                            bbl     0
+                     
+                     ;------------------------------------------------------------------------------
+                     ; multiply by 2 - REG0 = 2 * REG0,  extra bits are in regB
+                     ;------------------------------------------------------------------------------
+                     
+0027   20 00         mul2:           fim     0,$00
+0029   22 00                         fim     2,$00
+002b   50 03                         jms     add_xy
+002d   ab                            ld      $b
+002e   f5                            ral
+002f   bb                            xch     $b
+0030   c0                            bbl     0       
+                                     
+                     ;------------------------------------------------------------------------------
+                     ; Divide by a 4 bit value in r5:        [DST] = [DST] / reg5
+                     ;------------------------------------------------------------------------------
+0031   f0            div_r:          clb
+                     
+0032   28 00         div_r_set:      fim     8,0
+                     
+0034   b1            div_r_dloop:    xch     1       ; data loop
+0035   f8                            dac
+0036   b1                            xch     1
+0037   21                            src     0
+                     
+0038   ba                            xch     $a      ; fetch next 4 bits into r7
+0039   e9                            rdm
+003a   ba                            xch     $a
+                     
+003b   b9                            xch     9       ; 4 bit counter
+003c   dc                            ldm     $c
+003d   b9                            xch     9
+                                     
+003e   f1            div_r_bloop:    clc             ; bit loop
+003f   ba                            xch     $a
+0040   f5                            ral             ; rotate accu - regA left by one bit
+0041   ba                            xch     $a
+0042   f5                            ral
+0043   12 4b                         jc      div_r_sub
+                                     
+0045   95                            sub     5       ; try to sub the number
+0046   12 4d                         jc      div_r_sub_ok
+                                     
+0048   85                            add     5       ; add back the number
+0049   40 4e                         jun     div_r_skip
+                     
+004b   f1            div_r_sub:      clc
+004c   95                            sub     5       ; sub the number in case of carry
+004d   6a            div_r_sub_ok:   inc     $a
+                     
+004e   79 3e         div_r_skip:     isz     9,div_r_bloop
+                     
+0050   ba                            xch     $a
+0051   e0                            wrm
+0052   ba                            xch     $a
+                     
+0053   78 34                         isz     8,div_r_dloop
+                     
+0055   c0                            bbl     0
+                     
+                     ;------------------------------------------------------------------------------
+                     ; Divide 1 by an 8 bit value in r4, r5: REG2 = 1 / reg4-reg5
+                     ;------------------------------------------------------------------------------
+0056   20 20         div_x_one       fim     0,$20
+0058   50 19                         jms     storez
+                     
+005a   a4                            ld      4
+005b   1c 60                         jnz     div_rr_one
+                     
+005d   d1            div_r_one:      ldm     1
+005e   40 32                         jun     div_r_set
+                     
+0060   26 01         div_rr_one:     fim     6,1
+0062   40 69                         jun     div_rr_set
+                     
+                     
+                     ;------------------------------------------------------------------------------
+                     ; Divide by an 8 bit value in r4, r5:   [DST] = [DST] / reg4-reg5
+                     ;------------------------------------------------------------------------------
+0064   a4            div_x:          ld      4
+0065   14 31                         jz      div_r
+                     
+                     ;------------------------------------------------------------------------------
+                     ; Divide by an 8 bit value in r4, r5:   [DST] = [DST] / reg4-reg5
+                     ;------------------------------------------------------------------------------
+0067   26 00         div_rr:         fim     6,0     ; clear number
+0069   28 00         div_rr_set:     fim     8,0
+                     
+006b   b1            div_rr_dloop:   xch     1       ; data loop
+006c   f8                            dac
+006d   b1                            xch     1
+006e   21                            src     0
+                     
+006f   e9                            rdm             ; fetch next 4 bits into r7
+0070   ba                            xch     $a
+                     
+0071   dc                            ldm     $c      ; 4 bit counter
+0072   b9                            xch     9
+                                     
+0073   f1            div_rr_bloop:   clc             ; bit loop
+0074   ba                            xch     $a
+0075   f5                            ral             ; rotate reg6 - reg7 - regA left by one bit
+0076   ba                            xch     $a
+0077   b7                            xch     7
+0078   f5                            ral
+0079   b7                            xch     7
+007a   b6                            xch     6
+007b   f5                            ral
+007c   b6                            xch     6
+                                     
+007d   12 90                         jc      div_rr_sub
+                                     
+007f   b7                            xch     7       ; try to sub the number
+0080   95                            sub     5
+0081   b7                            xch     7
+0082   f3                            cmc
+0083   b6                            xch     6
+0084   94                            sub     4
+0085   b6                            xch     6
+                     
+0086   12 98                         jc      div_rr_sub_ok
+                                     
+0088   b7                            xch     7       ; add back the number
+0089   85                            add     5
+008a   b7                            xch     7
+008b   b6                            xch     6
+008c   84                            add     4
+008d   b6                            xch     6
+                     
+008e   40 99                         jun     div_rr_skip
+                     
+0090   f1            div_rr_sub:     clc             ; sub the number in case of carry
+0091   b7                            xch     7
+0092   95                            sub     5
+0093   b7                            xch     7
+0094   f3                            cmc
+0095   b6                            xch     6
+0096   94                            sub     4
+0097   b6                            xch     6
+                     
+0098   6a            div_rr_sub_ok:  inc     $a
+                     
+0099   79 73         div_rr_skip:    isz     9,div_rr_bloop
+                     
+009b   ba                            xch     $a
+009c   e0                            wrm
+009d   ba                            xch     $a
+                     
+009e   78 6b                         isz     8,div_rr_dloop
+                     
+00a0   c0                            bbl     0
+                     
+                     ;------------------------------------------------------------------------------
+                     ; calculate arc tg (1/n)
+                     ; r4,r5 : n
+                     ; re,rf : n*n (or n if n>127)
+                     ;------------------------------------------------------------------------------
+                     
+00a1   d0            arc_tg:         ldm     0
+00a2   bb            arc_tg_m:       xch     $b              
+00a3   50 56                         jms     div_x_one       ; prepare 1/x
+                     
+00a5   2c 01                         fim     $c,1
+                     
+00a7   20 00                         fim     0,$00
+00a9   22 20                         fim     2,$20
+                                     
+00ab   ab                            ld      $b
+00ac   f6                            rar
+00ad   12 b3                         jc      atg_minus
+                                     
+00af   50 03                         jms     add_xy
+00b1   40 b5                         jun     atg_loop
+                                     
+00b3   50 0d         atg_minus:      jms     sub_xy
+                     
+00b5                 atg_loop:
+0001                                 IF      DISPLAY
+00b5   51 7d                         jms     dsp_reg0
+                                     ENDIF
+                     
+00b7   f0                            clb                     ; next (2*k+1) 
+00b8   d2                            ldm     2
+00b9   8d                            add     $d
+00ba   bd                            xch     $d
+00bb   d0                            ldm     0
+00bc   8c                            add     $c
+00bd   bc                            xch     $c
+                                     
+00be   20 20                         fim     0,$20           ; REG2 = REG2 / n * n
+00c0   af                            ld      $f
+00c1   b5                            xch     5
+00c2   ae                            ld      $e
+00c3   b4                            xch     4
+00c4   50 64                         jms     div_x
+                                     
+00c6   ae                            ld      $e
+00c7   f5                            ral
+00c8   1a cc                         jnc     atg_skpdiv
+                                     
+00ca   50 64                         jms     div_x           ; in case of n>127 (n=239), 
+                                                             ;            another division is needed
+00cc   20 10         atg_skpdiv:     fim     0,$10           ; REG1 = REG2
+00ce   22 20                         fim     2,$20
+00d0   50 1f                         jms     mov_xy
+                     
+00d2   ad                            ld      $d              ; REG1 = REG1 / (2*k+1)
+00d3   b5                            xch     5
+00d4   ac                            ld      $c
+00d5   b4                            xch     4
+00d6   50 64                         jms     div_x
+                     
+00d8   21            atg_chk_loop:   src     0               ; Check if REG1 is zero
+00d9   e9                            rdm
+00da   1c df                         jnz     atg_nz
+00dc   71 d8                         isz     1,atg_chk_loop
+                     
+00de   c0                            bbl     0               ; return, if number is zero
+                                     
+00df   20 00         atg_nz:         fim     0,$00
+00e1   22 10                         fim     2,$10
+                                     
+00e3   6b                            inc     $b              ; alternate add/sub functions
+00e4   ab                            ld      $b
+00e5   f6                            rar
+00e6   12 ec                         jc      atg_sub
+                                     
+00e8   50 03                         jms     add_xy          ; REG0 = REG0 + REG1
+00ea   40 b5                         jun     atg_loop
+                     
+00ec   50 0d         atg_sub:        jms     sub_xy          ; REG0 = REG0 - REG1
+00ee   40 b5                         jun     atg_loop
+                             
+                     ;------------------------------------------------------------------------------
+                     ; main program
+                     ;------------------------------------------------------------------------------
+                     
+00f0   20 00         start:          fim     0,$0
+00f2   50 19                         jms     storez
+                     
+0000                                 IF EULER
+                     
+                     ; arc tg (1/2) + arc tg (1/3)
+                     
+                      
+                                     fim     4,3             ; prepare 3 & 9
+                                     fim     $e,9
+                                     jms     arc_tg
+                     
+                                     fim     4,2             ; prepare 2 & 4
+                                     fim     $e,4
+                                     jms     arc_tg
+                     
+                                     ENDIF
+                     
+0000                                 IF BETTER
+                     
+                     ; 2 * arc tg (1/3) + arc tg (1/7)
+                     
+                                     fim     4,3             ; prepare 3 & 9
+                                     fim     $e,9
+                                     jms     arc_tg
+                     
+                                     jms     mul2
+                     
+                                     fim     4,7             ; prepare 4 & 49
+                                     fim     $e,49
+                                     jms     arc_tg
+                     
+                                     ENDIF           
+                     
+0001                                 IF MACHIN
+                     
+                     ; 4 * arc tg (1/5) - arc tg (1/239)
+                     
+00f4   24 05                         fim     4,5             ; prepare 5 & 25
+00f6   2e 19                         fim     $e,25
+00f8   50 a1                         jms     arc_tg
+                     
+00fa   50 27                         jms     mul2
+00fc   50 27                         jms     mul2
+                     
+00fe   24 ef                         fim     4,239           ; prepare 239 
+0100   2e ef                         fim     $e,239
+0102   d1                            ldm     1
+0103   50 a2                         jms     arc_tg_m
+                     
+                                     ENDIF
+                     
+0105   d0                            ldm     0               ; clear the integer digit
+0106   bb                            xch     $b
+                     
+0107   50 27                         jms     mul2            ; multiply by 4
+0109   50 27                         jms     mul2
+                     
+0001                                 IF      DISPLAY
+010b   20 00                         fim     0,SD_OFF
+010d   51 85                         jms     dsp_set
+                                     ENDIF
+                     
+010f   20 20                         fim     0,$20           ; save Pi in binary
+0111   22 00                         fim     2,$00
+0113   50 1f                         jms     mov_xy
+                     
+                     ;------------------------------------------------------------------------------
+                     ; conversion from binary to decimal
+                     ;------------------------------------------------------------------------------
+0115   24 30                         fim     4,$30
+                     
+0117   25                            src     4
+0118   bb                            xch     $b              ; write the first digit into status cha
+0119   e4                            wr0
+                     
+011a   d0            mul10_loop:     ldm     0
+011b   bb                            xch     $b
+                     
+011c   b5                            xch     5
+011d   f8                            dac
+011e   b5                            xch     5
+                                     
+011f   20 10                         fim     0,$10           ; multiply by 10 = 2*(2*2+1)
+0121   22 00                         fim     2,$00                   
+0123   50 1f                         jms     mov_xy          
+0125   50 27                         jms     mul2
+0127   50 27                         jms     mul2
+0129   20 00                         fim     0,$00
+012b   22 10                         fim     2,$10                   
+012d   50 03                         jms     add_xy
+012f   f7                            tcc
+0130   8b                            add     $b
+0131   bb                            xch     $b
+0132   50 27                         jms     mul2
+0134   bb                            xch     $b
+                     
+0135   25                            src     4               ; write the result
+0136   e0                            wrm
+                                     
+0137   a5                            ld      5
+0138   1c 1a                         jnz     mul10_loop
+                     
+013a   20 00                         fim     0,$00           ; clean the remaining part of decimal c
+013c   50 19                         jms     storez
+013e   60                            inc     0
+013f   50 19                         jms     storez
+                     
+0001                                 IF      DISPLAY
+                     ;------------------------------------------------------------------------------
+                     ; Display the result in a 7 segment display
+                     ;
+                     ; Register usage:
+                     ;
+                     ; r0,r1         ROM table pointer, segment data
+                     ; r2,r3         ROM source pointer
+                     ; r4,r5         RAM pointer (source register)
+                     ; r6,r7         Wait counter
+                     ;------------------------------------------------------------------------------
+                                     
+0141   20 57         dsp_main:       fim     0,SD_P          ; P
+0143   51 6c                         jms     dsp_pattern
+                     
+0145   20 20                         fim     0,SD_i          ; i
+0147   51 6c                         jms     dsp_pattern
+                     
+0149   24 30                         fim     4,$30
+014b   25                            src     4
+                     
+014c   ec                            rd0
+014d   fa                            stc
+014e   51 61                         jms     dsp_digit
+                     
+0150   b5            dsp_loop:       xch     5
+0151   f8                            dac
+0152   b5                            xch     5
+                                     
+0153   25                            src     4               ; read the next digit
+0154   e9                            rdm
+0155   f1                            clc
+0156   51 61                         jms     dsp_digit
+                                     
+0158   a5                            ld      5
+0159   1c 50                         jnz     dsp_loop
+                     
+015b   20 00                         fim     0,SD_OFF        ; off 
+015d   51 6c                         jms     dsp_pattern
+                     
+015f   41 41                         jun     dsp_main
+                     
+0161   20 90         dsp_digit:      fim     0,digit_table   ; fetch digit pattern from table
+0163   b1                            xch     1
+0164   30                            fin     0
+                     
+0165   1a 6c                         jnc     dsp_pattern
+                                     
+0167   a0                            ld      0               ; switch on digit point
+0168   f5                            ral
+0169   fa                            stc
+016a   f6                            rar
+016b   b0                            xch     0
+                     
+016c   26 b6         dsp_pattern:    fim     6,$B6           ; display pattern with long wait
+016e   51 74                         jms     dsp_do
+0170   26 f0                         fim     6,$F0           ; display off with short wait
+0172   20 00                         fim     0,SD_OFF
+                                     
+0174   51 85         dsp_do:         jms     dsp_set
+                     
+0176   73 76         dsp_wait:       isz     3,dsp_wait
+0178   77 76                         isz     7,dsp_wait
+017a   76 76                         isz     6,dsp_wait
+017c   c0                            bbl     0
+                     
+017d   20 00         dsp_reg0:       fim     0,0             ; read 0
+017f   21                            src     0
+0180   e9                            rdm
+                     
+0181   20 90                         fim     0,digit_table   ; fetch digit pattern from table
+0183   b1                            xch     1
+0184   30                            fin     0
+                     
+0185   22 60         dsp_set:        fim     2,$60           ; ROM6 Port
+0187   23                            src     2
+0188   a0                            ld      0
+0189   e2                            wrr
+                                     
+018a   22 50                         fim     2,$50           ; ROM5 Port
+018c   23                            src     2
+018d   a1                            ld      1
+018e   e2                            wrr
+018f   c0                            bbl     0
+                     
+                     ;------------------------------------------------------------------------------
+                     ; 7 Segment display data:
+                     ;       ROM5 Port:DFEG (lower 4 bits)
+                     ;       ROM6 Port:PBCA (upper 4 bits) (P=Digit point)
+                     ;------------------------------------------------------------------------------
+0190                 digit_t0:
+0190                                 org     (digit_t0+$F) AND $FF0
+                     
+                                             ;PBCADFEG       ; PGFEDCBA      
+0190   7e            digit_table:    DB      %01111110       ; 00111111b     ; Digit 0
+0191   60                            DB      %01100000       ; 00000110b     ; Digit 1
+0192   5b                            DB      %01011011       ; 01011011b     ; Digit 2
+0193   79                            DB      %01111001       ; 01001111b     ; Digit 3
+0194   65                            DB      %01100101       ; 01100110b     ; Digit 4
+0195   3d                            DB      %00111101       ; 01101101b     ; Digit 5
+0196   3f                            DB      %00111111       ; 01111101b     ; Digit 6
+0197   70                            DB      %01110000       ; 00000111b     ; Digit 7
+0198   7f                            DB      %01111111       ; 01111111b     ; Digit 8
+0199   7d                            DB      %01111101       ; 01101111b     ; Digit 9
+019a   77                            DB      %01110111       ; 01110111b     ; Digit A
+019b   2f                            DB      %00101111       ; 01111100b     ; Digit B
+019c   1e                            DB      %00011110       ; 00111001b     ; Digit C
+019d   6b                            DB      %01101011       ; 01011110b     ; Digit D
+019e   1f                            DB      %00011111       ; 01111001b     ; Digit E
+019f   17                            DB      %00010111       ; 01110001b     ; Digit F
+0057                 SD_P:           EQU     %01010111       ; 01110011b     ; P
+0020                 SD_i:           EQU     %00100000       ; 00000100b     ; i
+00ff                 SD_ON:          EQU     %11111111       ; 11111111b     ; ON
+0000                 SD_OFF:         EQU     %00000000       ; 00000000b     ; OFF
+                     
+                                     ELSE
+                                     
+                     prg_end:        jms     prg_end
+                     
+                                     ENDIF
+                     
+01a0                                 end
+------------------------------------------------------------------------------
+0000  BETTER        0001  DISPLAY       0000  EULER         0001  MACHIN    
+0000  SD_OFF        00ff  SD_ON         0057  SD_P          0020  SD_i      
+0004  add_loop      0003  add_xy        00a1  arc_tg        00a2  arc_tg_m  
+00d8  atg_chk_loop  00b5  atg_loop      00b3  atg_minus     00df  atg_nz    
+00cc  atg_skpdiv    00ec  atg_sub       0190  digit_t0      0190  digit_table
+0031  div_r         003e  div_r_bloop   0034  div_r_dloop   005d  div_r_one 
+0032  div_r_set     004e  div_r_skip    004b  div_r_sub     004d  div_r_sub_ok
+0067  div_rr        0073  div_rr_bloop  006b  div_rr_dloop  0060  div_rr_one
+0069  div_rr_set    0099  div_rr_skip   0090  div_rr_sub    0098  div_rr_sub_ok
+0064  div_x         0056  div_x_one     0161  dsp_digit     0174  dsp_do    
+0150  dsp_loop      0141  dsp_main      016c  dsp_pattern   017d  dsp_reg0  
+0185  dsp_set       0176  dsp_wait      001f  mov_loop      001f  mov_xy    
+011a  mul10_loop    0027  mul2          00f0  start         001a  store     
+0019  storez        000e  sub_loop      000d  sub_xy        
+
