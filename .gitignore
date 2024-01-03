@@ -1,8 +1,7 @@
 node_modules
 
 .vitepress
-src/.vitepress/*
-!src/.vitepress/config.ts
-!src/.vitepress/theme
+.vitepress/cache
+.vitepress/dist
 
 .vscode
