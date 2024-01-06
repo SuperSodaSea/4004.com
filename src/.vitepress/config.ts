@@ -74,6 +74,11 @@ export default defineConfig({
         for (const file of [ 'hashmap.json', 'package.json' ])
             await rm(path.join(siteConfig.outDir, file));
     },
+    markdown: {
+        emoji: {
+            shortcuts: {},
+        },
+    },
     vite: {
         plugins: [ rollupPluginKeepAssets() ],
         build: {
